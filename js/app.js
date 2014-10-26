@@ -40,9 +40,11 @@ jQuery(function ($) {
 
 	var App = {
 		init: function () {
+
 			this.todos = util.store('todos-jquery');
 			this.cacheElements();
 			this.bindEvents();
+			this.getRepos();
 
 			Router({
 				'/:filter': function (filter) {
@@ -74,6 +76,20 @@ jQuery(function ($) {
 			list.on('keyup', '.edit', this.editKeyup.bind(this));
 			list.on('focusout', '.edit', this.update.bind(this));
 			list.on('click', '.destroy', this.destroy.bind(this));
+
+		},
+		renderRepos: function(repos){
+			_.each(repos, function(item){
+
+				$("#repoList").append('<option value=' + item.title + '>' + item.title+ '</option>');
+			});
+			var that = this;
+			
+			this.getIssues($("#repoList").val());
+			
+			$('#repoList').on('change', function(){
+    		that.getIssues($(this).val());
+    	});
 		},
 		render: function () {
 			var todos = this.getFilteredTodos();
@@ -135,6 +151,7 @@ jQuery(function ($) {
 		// returns the corresponding index in the `todos` array
 		indexFromEl: function (el) {
 			var id = $(el).closest('li').data('id');
+
 			var todos = this.todos;
 			var i = todos.length;
 
@@ -143,6 +160,40 @@ jQuery(function ($) {
 					return i;
 				}
 			}
+		},
+		getRepos:function(){
+			var repos = [];
+			var that = this;
+			$.get(" https://api.github.com/users/cenkayberkin/repos",function(data){
+				_.each(data, function(item){
+			  	var extracted_data = _.pick(item, 'name', 'id');
+			  	repos.push({
+						id: extracted_data.id,
+						title: extracted_data.name,
+					});
+			  });
+			  that.renderRepos(repos);
+			});
+		},
+		getIssues: function (repo) {
+			var result = [];
+			var that = this;
+			var requestString = "https://api.github.com/repos/cenkayberkin/" + repo + "/issues";
+			$.get(requestString, function( data ) {
+			  _.each(data, function(item){
+			  	var extracted_data = _.pick(item, 'body', 'id','title','number');
+			  	result.push({
+						id: extracted_data.id,
+						title: extracted_data.title,
+						number: extracted_data.number,
+						repo: repo,
+						completed: false
+					});
+			  });
+
+			  that.todos = result;
+			  that.render();
+			});
 		},
 		create: function (e) {
 			var $input = $(e.target);
@@ -201,11 +252,41 @@ jQuery(function ($) {
 
 			this.render();
 		},
+		destroyIssueOnGithub: function(repo, issue_num){
+			var githubUrl = 'https://api.github.com/repos/cenkayberkin/'+ repo +'/issues/'+ issue_num.toString();
+			var that = this;
+			$.ajax({
+	    	beforeSend: function (xhr) {
+	    		xhr.setRequestHeader ("Authorization", "");
+        },
+				type: 'POST',
+				url: githubUrl,
+		    dataType: 'json',
+		    data: '{"state": "closed"}',
+		    success: function(data) {
+		        // console.log(data);
+  	    		that.render();
+		    }
+				}).done(function( msg ) {
+	    		console.log();
+	    		
+  			});
+		},
 		destroy: function (e) {
 			this.todos.splice(this.indexFromEl(e.target), 1);
-			this.render();
+
+			var number = $(e.target).closest('li').data('number');
+			var repo = $(e.target).closest('li').data('repo');
+			this.destroyIssueOnGithub(repo,number);
+
+			// this.render();
 		}
 	};
-
 	App.init();
 });
+
+
+
+
+
+
