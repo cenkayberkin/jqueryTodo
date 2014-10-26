@@ -40,9 +40,11 @@ jQuery(function ($) {
 
 	var App = {
 		init: function () {
+
 			this.todos = util.store('todos-jquery');
 			this.cacheElements();
 			this.bindEvents();
+			this.getRepos();
 
 			Router({
 				'/:filter': function (filter) {
@@ -74,6 +76,22 @@ jQuery(function ($) {
 			list.on('keyup', '.edit', this.editKeyup.bind(this));
 			list.on('focusout', '.edit', this.update.bind(this));
 			list.on('click', '.destroy', this.destroy.bind(this));
+
+		},
+		renderRepos: function(repos){
+			_.each(repos, function(item){
+
+				$("#repoList").append('<option value=' + item.title + '>' + item.title+ '</option>');
+			});
+			var that = this;
+			//bununla issue listesini populate et.
+			this.getIssues($("#repoList").val());
+			console.log($("#repoList").val());
+			
+			$('#repoList').on('change', function(){
+    		console.log($(this).val());
+    		that.getIssues($(this).val());
+    	});
 		},
 		render: function () {
 			var todos = this.getFilteredTodos();
@@ -144,6 +162,40 @@ jQuery(function ($) {
 				}
 			}
 		},
+		getRepos:function(){
+			console.log("get repos called");
+			var repos = [];
+			var that = this;
+			$.get(" https://api.github.com/users/cenkayberkin/repos",function(data){
+				_.each(data, function(item){
+			  	var extracted_data = _.pick(item, 'name', 'id');
+			  	repos.push({
+						id: extracted_data.id,
+						title: extracted_data.name,
+					});
+			  });
+			  that.renderRepos(repos);
+			});
+		},
+		getIssues: function (repo) {
+			var result = [];
+			var that = this;
+			var requestString = "https://api.github.com/repos/cenkayberkin/" + repo + "/issues";
+			$.get(requestString, function( data ) {
+			  _.each(data, function(item){
+			  	var extracted_data = _.pick(item, 'body', 'id','title');
+			  	result.push({
+						id: extracted_data.id,
+						title: extracted_data.title,
+						completed: false
+					});
+			  });
+
+			  that.todos = result;
+			  console.log(result);
+			  that.render();
+			});
+		},
 		create: function (e) {
 			var $input = $(e.target);
 			var val = $input.val().trim();
@@ -205,7 +257,9 @@ jQuery(function ($) {
 			this.todos.splice(this.indexFromEl(e.target), 1);
 			this.render();
 		}
+
 	};
 
 	App.init();
+
 });
