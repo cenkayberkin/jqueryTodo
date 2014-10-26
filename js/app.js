@@ -84,12 +84,10 @@ jQuery(function ($) {
 				$("#repoList").append('<option value=' + item.title + '>' + item.title+ '</option>');
 			});
 			var that = this;
-			//bununla issue listesini populate et.
+			
 			this.getIssues($("#repoList").val());
-			console.log($("#repoList").val());
 			
 			$('#repoList').on('change', function(){
-    		console.log($(this).val());
     		that.getIssues($(this).val());
     	});
 		},
@@ -153,6 +151,7 @@ jQuery(function ($) {
 		// returns the corresponding index in the `todos` array
 		indexFromEl: function (el) {
 			var id = $(el).closest('li').data('id');
+
 			var todos = this.todos;
 			var i = todos.length;
 
@@ -163,7 +162,6 @@ jQuery(function ($) {
 			}
 		},
 		getRepos:function(){
-			console.log("get repos called");
 			var repos = [];
 			var that = this;
 			$.get(" https://api.github.com/users/cenkayberkin/repos",function(data){
@@ -183,16 +181,17 @@ jQuery(function ($) {
 			var requestString = "https://api.github.com/repos/cenkayberkin/" + repo + "/issues";
 			$.get(requestString, function( data ) {
 			  _.each(data, function(item){
-			  	var extracted_data = _.pick(item, 'body', 'id','title');
+			  	var extracted_data = _.pick(item, 'body', 'id','title','number');
 			  	result.push({
 						id: extracted_data.id,
 						title: extracted_data.title,
+						number: extracted_data.number,
+						repo: repo,
 						completed: false
 					});
 			  });
 
 			  that.todos = result;
-			  console.log(result);
 			  that.render();
 			});
 		},
@@ -253,13 +252,41 @@ jQuery(function ($) {
 
 			this.render();
 		},
+		destroyIssueOnGithub: function(repo, issue_num){
+			var githubUrl = 'https://api.github.com/repos/cenkayberkin/'+ repo +'/issues/'+ issue_num.toString();
+			var that = this;
+			$.ajax({
+	    	beforeSend: function (xhr) {
+	    		xhr.setRequestHeader ("Authorization", "");
+        },
+				type: 'POST',
+				url: githubUrl,
+		    dataType: 'json',
+		    data: '{"state": "closed"}',
+		    success: function(data) {
+		        // console.log(data);
+  	    		that.render();
+		    }
+				}).done(function( msg ) {
+	    		console.log();
+	    		
+  			});
+		},
 		destroy: function (e) {
 			this.todos.splice(this.indexFromEl(e.target), 1);
-			this.render();
+
+			var number = $(e.target).closest('li').data('number');
+			var repo = $(e.target).closest('li').data('repo');
+			this.destroyIssueOnGithub(repo,number);
+
+			// this.render();
 		}
-
 	};
-
 	App.init();
-
 });
+
+
+
+
+
+
